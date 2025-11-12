@@ -1,0 +1,65 @@
+package {{ base_pkg }};
+
+{# ENTITY imports #}
+{% if layer == 'entity' %}
+import lombok.*;
+import {{ persistence_pkg }}.*;
+
+{# REPOSITORY imports #}
+{% elif layer == 'repository' %}
+import org.springframework.stereotype.Repository;
+import org.springframework.data.jpa.repository.JpaRepository;
+{% if layer_pkgs.entity != base_pkg %}
+import {{ layer_pkgs.entity }}.{{ entity }};
+{% endif %}
+
+{# SERVICE INTERFACE imports #}
+{% elif layer == 'service_interface' %}
+{% if config.features.pagination_and_sorting %}
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+{% else %}
+import java.util.List;
+{% endif %}
+{% if layer_pkgs.entity != base_pkg %}
+import {{ layer_pkgs.entity }}.{{ entity }};
+{% endif %}
+
+{# SERVICE IMPL imports #}
+{% elif layer == 'service_impl' %}
+import org.springframework.stereotype.Service;
+import lombok.RequiredArgsConstructor;
+{% if config.features.pagination_and_sorting %}
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+{% else %}
+import java.util.List;
+{% endif %}
+{% if layer_pkgs.entity != base_pkg %}
+import {{ layer_pkgs.entity }}.{{ entity }};
+{% endif %}
+{% if layer_pkgs.repository != base_pkg %}
+import {{ layer_pkgs.repository }}.{{ entity }}Repository;
+{% endif %}
+{% if layer_pkgs.service != base_pkg %}
+import {{ layer_pkgs.service }}.{{ entity }}Service;
+{% endif %}
+
+{# CONTROLLER imports #}
+{% elif layer == 'controller' %}
+import org.springframework.web.bind.annotation.*;
+import org.springframework.http.ResponseEntity;
+import lombok.RequiredArgsConstructor;
+{% if config.features.pagination_and_sorting %}
+import org.springframework.data.domain.*;
+import org.springframework.data.web.PageableDefault;
+{% else %}
+import java.util.List;
+{% endif %}
+{% if layer_pkgs.entity != base_pkg %}
+import {{ layer_pkgs.entity }}.{{ entity }};
+{% endif %}
+{% if layer_pkgs.service != base_pkg %}
+import {{ layer_pkgs.service }}.{{ entity }}Service;
+{% endif %}
+{% endif %}

@@ -1,0 +1,17 @@
+{% include "_imports.java.j2" %}
+public interface {{ entity }}Service {
+
+    {{ entity }} getById(Long id);
+
+    {{ entity }} save({{ entity }} obj);
+    
+    {{ entity }} update({{ entity }} obj);
+
+{% if config.features.pagination_and_sorting %}
+    Page<{{ entity }}> getPage(Pageable pageable);
+{% else %}
+    List<{{ entity }}> getAll();
+{% endif %}
+
+    void delete(Long id);
+}

@@ -1,0 +1,50 @@
+{% include "_imports.java.j2" %}
+@RestController
+@RequestMapping("/{{ lower }}s")
+@RequiredArgsConstructor
+public class {{ entity }}Controller {
+
+    private final {{ entity }}Service service;
+
+    @GetMapping("/{id}")
+    public ResponseEntity<?> getById(@PathVariable Long id) {
+        return ResponseEntity.ok(service.getById(id));
+    }
+
+    @PostMapping
+    public ResponseEntity<?> create(@RequestBody {{ entity }} obj) {
+        return ResponseEntity.ok(service.save(obj));
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<?> update(@PathVariable Long id, @RequestBody {{ entity }} obj) {
+        return ResponseEntity.ok(service.update(obj));
+    }
+
+{% if config.features.pagination_and_sorting %}
+    {# Build @PageableDefault from config.api #}
+    {% set psize = (config.api.defaultPageSize or 20)|int %}
+    {% set dsort = (config.api.defaultSort or '') %}
+    {% set parts = dsort.split(',') %}
+    {% set field = (parts[0].strip() if parts|length > 0 and parts[0] else '') %}
+    {% set dirn = (parts[1].strip().upper() if parts|length > 1 and parts[1] else 'ASC') %}
+    @GetMapping
+    public ResponseEntity<?> getAll(
+        @PageableDefault(page = 0, size = {{ psize }}{% if field %}, sort = "{{ field }}", direction = Sort.Direction.{{ 'DESC' if dirn == 'DESC' else 'ASC' }}{% endif %})
+        Pageable pageable) {
+        Page<{{ entity }}> page = service.getPage(pageable);
+        return ResponseEntity.ok(page);
+    }
+{% else %}
+    @GetMapping
+    public ResponseEntity<?> getAll() {
+        return ResponseEntity.ok(service.getAll());
+    }
+{% endif %}
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> delete(@PathVariable Long id) {
+        service.delete(id);
+        return ResponseEntity.noContent().build();
+    }
+}

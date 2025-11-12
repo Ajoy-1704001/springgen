@@ -1,0 +1,39 @@
+{% include "_imports.java.j2" %}
+@Service
+@RequiredArgsConstructor
+public class {{ entity }}ServiceImpl implements {{ entity }}Service {
+
+    private final {{ entity }}Repository repository;
+
+{% if config.features.pagination_and_sorting %}
+    @Override
+    public Page<{{ entity }}> getPage(Pageable pageable) {
+        return null;
+    }
+{% else %}
+    @Override
+    public List<{{ entity }}> getAll() {
+        return null;
+    }
+{% endif %}
+
+    @Override
+    public {{ entity }} getById(Long id) {
+        return null;
+    }
+
+    @Override
+    public {{ entity }} save({{ entity }} obj) {
+        return null;
+    }
+    
+    @Override
+    public {{ entity }} update({{ entity }} obj) {
+        return null;
+    }
+
+    @Override
+    public void delete(Long id) {
+        return;
+    }
+}
