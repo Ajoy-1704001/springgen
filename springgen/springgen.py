@@ -4,6 +4,8 @@ import sys
 import json
 import argparse
 import xml.etree.ElementTree as ET
+import shlex
+import subprocess
 
 from springgen.spring_templates import GENERATORS
 from springgen.utils import print_banner
@@ -14,14 +16,27 @@ except ImportError:
     print("Please install required packages: pip install pyfiglet termcolor")
     sys.exit(1)
 
+# Optional YAML support
+try:
+    import yaml
+except Exception:
+    yaml = None
+
 # -------------------- CONSTANTS / CONFIG --------------------
 BASE_SRC = "src/main/java"
 CONFIG_DIR = os.path.expanduser("~/.springgen")
-CONFIG_FILE = os.path.join(CONFIG_DIR, "config.json")
+CONFIG_FILE = os.path.join(CONFIG_DIR, "config.yml")
 
 DEFAULT_CONFIG = {
     "base_package": "com.example.demo",
-    "persistence_package": "auto",
+    "persistence_package": "auto",  # "jakarta.persistence" | "javax.persistence" | "auto"
+    "features": {
+        "pagination_and_sorting": True
+    },
+    "api": {
+        "defaultPageSize": 10,
+        "defaultSort": "id,asc"
+    },
     "folders": {
         "entity": "model",
         "repository": "repository",
@@ -34,22 +49,43 @@ MAVEN_NS = {'m': 'http://maven.apache.org/POM/4.0.0'}
 
 # -------------------- CONFIG HELPERS --------------------
 def ensure_config():
+    """Ensure config directory and a config file exist. Prefer YAML; fallback to JSON if PyYAML missing."""
     if not os.path.exists(CONFIG_DIR):
         os.makedirs(CONFIG_DIR)
     if not os.path.exists(CONFIG_FILE):
-        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-            json.dump(DEFAULT_CONFIG, f, indent=4)
-        print(colored("⚙️  Default config created at ~/.springgen/config.json", "yellow"))
+        if yaml is None:
+            alt = os.path.join(CONFIG_DIR, "config.json")
+            with open(alt, "w", encoding="utf-8") as f:
+                json.dump(DEFAULT_CONFIG, f, indent=2)
+            print(colored(f"⚙️  PyYAML not installed. Wrote JSON: {alt}", "yellow"))
+        else:
+            with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+                yaml.safe_dump(DEFAULT_CONFIG, f, sort_keys=False)
+            print(colored(f"⚙️  Default YAML config created at {CONFIG_FILE}", "yellow"))
 
 def load_config():
+    """Load YAML config if present; else fallback to legacy JSON; else default."""
     ensure_config()
-    with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
+    if os.path.exists(CONFIG_FILE) and yaml is not None:
+        with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+            return yaml.safe_load(f) or {}
+    legacy_json = os.path.join(CONFIG_DIR, "config.json")
+    if os.path.exists(legacy_json):
+        with open(legacy_json, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return dict(DEFAULT_CONFIG)
 
 def save_config(data):
+    """Save as YAML if possible; else JSON fallback."""
     ensure_config()
-    with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=4)
+    if yaml is not None:
+        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+            yaml.safe_dump(data, f, sort_keys=False)
+    else:
+        alt = os.path.join(CONFIG_DIR, "config.json")
+        with open(alt, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
+        print(colored(f"⚠️  Saved config as JSON (PyYAML missing): {alt}", "yellow"))
 
 def ask_yes_no(question, default="y"):
     ans = input(f"{question} [y/n] (default {default}): ").strip().lower()
@@ -67,6 +103,57 @@ def write_file(path, content):
         f.write(content)
     print(f"✅ Created {path}")
 
+def _parse_value(v: str):
+    """Heuristic parse for --set values: bool/int/float/str."""
+    vl = str(v).strip()
+    if vl.lower() in ("true", "false"):
+        return vl.lower() == "true"
+    try:
+        if "." in vl:
+            return float(vl)
+        return int(vl)
+    except ValueError:
+        return vl
+
+def set_keypath(cfg: dict, keypath: str, value):
+    """
+    Set nested key by dot.path, e.g.:
+      features.pagination_and_sorting=true
+      api.defaultPageSize=50
+      folders.entity=model
+    """
+    parts = [p for p in keypath.split(".") if p]
+    if not parts:
+        return
+    cur = cfg
+    for p in parts[:-1]:
+        if p not in cur or not isinstance(cur[p], dict):
+            cur[p] = {}
+        cur = cur[p]
+    cur[parts[-1]] = value
+
+def get_default_editor():
+    ed = os.environ.get("VISUAL") or os.environ.get("EDITOR")
+    if ed:
+        return ed
+    if os.name == "nt":
+        return "notepad"
+    # Sensible UNIX-ish fallbacks
+    # Try VS Code wait flag first so the script pauses until file is closed.
+    return "code -w" if _which("code") else ("nano" if _which("nano") else "vi")
+
+def _which(cmd):
+    from shutil import which
+    return which(cmd) is not None
+
+def open_in_editor(path: str):
+    editor = get_default_editor()
+    try:
+        cmd = shlex.split(editor) + [path]
+        subprocess.call(cmd)
+    except Exception as e:
+        print(colored(f"⚠️  Failed to open editor '{editor}': {e}", "yellow"))
+        print(colored(f"   Please edit the file manually: {path}", "yellow"))
 
 # -------------------- MAIN --------------------
 def main():
@@ -76,28 +163,44 @@ def main():
     parser = argparse.ArgumentParser(description="Spring Boot CRUD generator")
     parser.add_argument("entities", nargs="*", help="Entity names (optional)")
     parser.add_argument("--single-folder", type=str, help="Put all files inside a single folder under the base package")
-    parser.add_argument("--config", action="store_true", help="Edit settings (base_package, folders, persistence_package)")
+    parser.add_argument("--config", action="store_true", help="Show current settings (then optionally edit)")
+    parser.add_argument("--edit-config", action="store_true", help="Open the config file in your editor")
+    parser.add_argument("--set", action="append", metavar="KEYPATH=VALUE",
+                        help="Set a config value via key path (e.g., features.pagination_and_sorting=true, api.defaultPageSize=50). Can be used multiple times.")
     args = parser.parse_args()
 
+    # Inline key updates first (allows chaining with generation)
+    if args.set:
+        for kv in args.set:
+            if "=" not in kv:
+                print(colored(f"❌ Invalid --set value: {kv} (expected KEYPATH=VALUE)", "red"))
+                sys.exit(1)
+            k, v = kv.split("=", 1)
+            set_keypath(config, k.strip(), _parse_value(v))
+        save_config(config)
+        print(colored("✅ Config updated (via --set).", "green"))
+        config = load_config()  # reload
+
     if args.config:
-        print(json.dumps(config, indent=4))
-        if ask_yes_no("Do you want to modify settings?", "n"):
-            # base package
-            new_bp = input(f"base_package [{config.get('base_package','')}]: ").strip()
-            if new_bp:
-                config["base_package"] = new_bp
-            # persistence package
-            pp = config.get("persistence_package", "auto")
-            new_pp = input(f"persistence_package (jakarta.persistence / javax.persistence / auto) [{pp}]: ").strip()
-            if new_pp:
-                config["persistence_package"] = new_pp
-            # folder names
-            for k, v in config["folders"].items():
-                new_v = input(f"{k} folder name [{v}]: ").strip()
-                if new_v:
-                    config["folders"][k] = new_v
-            save_config(config)
-            print(colored("✅ Config updated successfully!", "green"))
+        # Show current config (YAML if available; else JSON)
+        if yaml is not None:
+            print(yaml.safe_dump(config, sort_keys=False))
+        else:
+            print(json.dumps(config, indent=2))
+        if ask_yes_no("Open the config in your editor?", "n"):
+            ensure_config()
+            path = CONFIG_FILE if os.path.exists(CONFIG_FILE) else os.path.join(CONFIG_DIR, "config.json")
+            open_in_editor(path)
+            config = load_config()
+            print(colored("✅ Config reloaded.", "green"))
+        return
+
+    if args.edit_config:
+        ensure_config()
+        path = CONFIG_FILE if os.path.exists(CONFIG_FILE) else os.path.join(CONFIG_DIR, "config.json")
+        open_in_editor(path)
+        config = load_config()
+        print(colored("✅ Config reloaded.", "green"))
         return
 
     # Entities
@@ -142,16 +245,16 @@ def main():
     layers_to_generate = ["entity"]
 
     # Repository?
-    if ask_yes_no(f"Do you want to generate Repository layer for all entities?"):
+    if ask_yes_no("Do you want to generate Repository layer for all entities?"):
         layers_to_generate.append("repository")
 
     # Service? (interface + impl together)
-    if ask_yes_no(f"Do you want to generate Service layer (interface + impl) for all entities?"):
+    if ask_yes_no("Do you want to generate Service layer (interface + impl) for all entities?"):
         layers_to_generate.append("service")
         layers_to_generate.append("service_impl")
 
     # Controller?
-    if ask_yes_no(f"Do you want to generate Controller layer for all entities?"):
+    if ask_yes_no("Do you want to generate Controller layer for all entities?"):
         layers_to_generate.append("controller")
 
     # Generate files
@@ -160,9 +263,11 @@ def main():
         for layer in layers_to_generate:
             pkg = layer_pkgs[layer]
             base_path = os.path.join(BASE_SRC, pkg.replace(".", "/"))
-            filename = f"{entity}.java" if layer == "entity" else (f"{entity}ServiceImpl.java" 
-                                                                   if layer=="service_impl" 
-                                                                   else f"{entity}{layer.capitalize()}.java")
+            filename = (
+                f"{entity}.java" if layer == "entity"
+                else (f"{entity}ServiceImpl.java" if layer == "service_impl"
+                      else f"{entity}{layer.capitalize()}.java")
+            )
             content = GENERATORS[layer](pkg, entity, layer_pkgs, config)
             path = os.path.join(base_path, filename)
             write_file(path, content)
