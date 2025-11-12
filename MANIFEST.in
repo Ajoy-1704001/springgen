@@ -1,0 +1,2 @@
+recursive-include springgen/templates *
+include README.md

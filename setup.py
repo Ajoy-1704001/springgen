@@ -4,9 +4,12 @@ setup(
     name="springgen",
     version="1.0.1.dev1",
     packages=find_packages(),
+    include_package_data=True,
     install_requires=[
         "pyfiglet",
-        "termcolor"
+        "termcolor",
+        "jinja2",
+        "pyyaml"
     ],
     entry_points={
         "console_scripts": [
