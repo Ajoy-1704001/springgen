@@ -7,7 +7,7 @@ public class {{ entity }}Controller {
     private final {{ entity }}Service service;
 
     @GetMapping("/{id}")
-    public ResponseEntity<?> getById(@PathVariable Long id) {
+    public ResponseEntity<?> getById(@PathVariable {{ pk_type }} id) {
         return ResponseEntity.ok(service.getById(id));
     }
 
@@ -17,7 +17,7 @@ public class {{ entity }}Controller {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<?> update(@PathVariable Long id, @RequestBody {{ entity }} obj) {
+    public ResponseEntity<?> update(@PathVariable {{ pk_type }} id, @RequestBody {{ entity }} obj) {
         return ResponseEntity.ok(service.update(obj));
     }
 
@@ -43,7 +43,7 @@ public class {{ entity }}Controller {
 {% endif %}
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<?> delete(@PathVariable Long id) {
+    public ResponseEntity<?> delete(@PathVariable {{ pk_type }} id) {
         service.delete(id);
         return ResponseEntity.noContent().build();
     }
