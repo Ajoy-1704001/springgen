@@ -1,7 +1,7 @@
 {% include "_imports.java.j2" %}
 public interface {{ entity }}Service {
 
-    {{ entity }} getById(Long id);
+    {{ entity }} getById({{ config['entity']['primary_key']['type'] }} id);
 
     {{ entity }} save({{ entity }} obj);
     
@@ -13,5 +13,5 @@ public interface {{ entity }}Service {
     List<{{ entity }}> getAll();
 {% endif %}
 
-    void delete(Long id);
+    void delete({{ config['entity']['primary_key']['type'] }} id);
 }

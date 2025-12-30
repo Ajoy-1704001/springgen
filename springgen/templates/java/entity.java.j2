@@ -7,6 +7,6 @@
 @Builder
 public class {{ entity }} {
     @Id
-    @GeneratedValue(strategy = GenerationType.{{ pk_strategy_type }})
-    private {{ pk_type }} id;
+    @GeneratedValue(strategy = GenerationType.{{ config['entity']['primary_key']['strategy'] }})
+    private {{ config['entity']['primary_key']['type'] }} {{ config['entity']['primary_key']['name'] | default('id') }};
 }
