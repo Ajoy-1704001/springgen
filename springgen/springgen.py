@@ -252,7 +252,7 @@ def ensure_primary_key_config(config: dict) -> dict:
         save_config(config)
         print(
             colored(
-                f"✅ Default PK saved: {pk_cfg['type']} {pk_cfg['name']} ({pk_cfg['strategy']})",
+                f"✅ Default PK saved: {pk_cfg['type']} {pk_cfg['name']} {pk_cfg['strategy']}",
                 "green",
             )
         )
@@ -339,6 +339,7 @@ def main():
         save_config(config)
         print(colored("✅ Config updated (via --set).", "green"))
         config = load_config()  # reload
+        sys.exit()
 
     if args.config:
         # Show current config (YAML if available; else JSON)
