@@ -63,3 +63,7 @@ import {{ layer_pkgs.entity }}.{{ entity }};
 import {{ layer_pkgs.service }}.{{ entity }}Service;
 {% endif %}
 {% endif %}
+
+{% if pk_type == 'UUID' %}
+import java.util.UUID;
+{% endif %}

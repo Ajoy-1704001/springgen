@@ -11,7 +11,10 @@
 ✅ Uses **YAML config** stored under `~/.springgen/config.yml`  
 ✅ Generates clean, **Lombok-based** classes with constructor injection  
 ✅ **Jinja2-powered templates** (easy to customize)  
-✅ Auto-detects `jakarta.persistence` or `javax.persistence`  
+✅ Auto-detects `jakarta.persistence` or `javax.persistence`
+✅ Configurable primary key type & generation strategy (global + per entity) ⭐
+✅ Single-folder package mode for compact architectures
+✅ Live config editing via CLI or editor
 ✅ Works cross-platform (Linux / macOS / Windows)
 
 ---
@@ -76,6 +79,11 @@ folders:
   repository: repository
   service: service
   controller: controller
+entity:
+  primary_key:
+    name: id
+    type: Long
+    strategy: IDENTITY
 ```
 Edit interactively
 

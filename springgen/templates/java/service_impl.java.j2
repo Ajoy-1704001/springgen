@@ -18,7 +18,7 @@ public class {{ entity }}ServiceImpl implements {{ entity }}Service {
 {% endif %}
 
     @Override
-    public {{ entity }} getById(Long id) {
+    public {{ entity }} getById({{ config['entity']['primary_key']['type'] }} id) {
         return null;
     }
 
@@ -33,7 +33,7 @@ public class {{ entity }}ServiceImpl implements {{ entity }}Service {
     }
 
     @Override
-    public void delete(Long id) {
+    public void delete({{ config['entity']['primary_key']['type'] }} id) {
         return;
     }
 }
